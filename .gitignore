@@ -28,3 +28,9 @@ temp/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Internal planning notes (not for submission)
+production-plan.md
+requirements.md
+docs/requirements-coverage.md
+docs/video-speaking-script.md
