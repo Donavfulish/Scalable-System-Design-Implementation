@@ -9,14 +9,13 @@ This project implements:
   - `GET /products` -> Slave
 
 ## Quick Start
+Need docker first
 1. Start stack:
    - `docker compose up -d --build`
 2. Verify:
    - `powershell -ExecutionPolicy Bypass -File .\scripts\verify.ps1`
 3. Chaos test:
    - `powershell -ExecutionPolicy Bypass -File .\scripts\chaos-test.ps1`
-4. One-click video flow:
-   - `powershell -ExecutionPolicy Bypass -File .\scripts\video-demo.ps1`
 
 ## Main Files
 - `docker-compose.yml`
