@@ -3,6 +3,7 @@
 ```mermaid
 flowchart LR
     C[Client / Postman / curl] --> LB[Nginx Load Balancer]
+
     LB --> A1[API Node 1]
     LB --> A2[API Node 2]
 
