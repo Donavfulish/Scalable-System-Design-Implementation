@@ -1,0 +1,17 @@
+CREATE USER IF NOT EXISTS 'repl_user'@'%' IDENTIFIED WITH mysql_native_password BY 'repl_pass';
+GRANT REPLICATION SLAVE ON *.* TO 'repl_user'@'%';
+CREATE USER IF NOT EXISTS 'admin_user'@'%' IDENTIFIED BY 'admin_pass';
+GRANT ALL PRIVILEGES ON *.* TO 'admin_user'@'%' WITH GRANT OPTION;
+CREATE USER IF NOT EXISTS 'app_user'@'%' IDENTIFIED BY 'app_pass';
+GRANT ALL PRIVILEGES ON scalable_app.* TO 'app_user'@'%';
+FLUSH PRIVILEGES;
+
+CREATE DATABASE IF NOT EXISTS scalable_app;
+USE scalable_app;
+
+CREATE TABLE IF NOT EXISTS products (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  price DECIMAL(10,2) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

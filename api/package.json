@@ -1,0 +1,13 @@
+{
+  "name": "scalable-products-api",
+  "version": "1.0.0",
+  "description": "Products API with read/write DB splitting",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "mysql2": "^3.11.3"
+  }
+}

@@ -1,0 +1,142 @@
+services:
+  mysql-master:
+    image: mysql:8.0
+    container_name: mysql-master
+    restart: unless-stopped
+    command: --server-id=1 --log-bin=mysql-bin --binlog-format=ROW
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_ROOT_HOST: "%"
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-scalable_app}
+    ports:
+      - "${MYSQL_MASTER_PORT:-3307}:3306"
+    volumes:
+      - ./infra/mysql/master/init:/docker-entrypoint-initdb.d
+      - master_data:/var/lib/mysql
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpass"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mysql-slave:
+    image: mysql:8.0
+    container_name: mysql-slave
+    restart: unless-stopped
+    command: --server-id=2 --relay-log=relay-bin
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_ROOT_HOST: "%"
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-scalable_app}
+    ports:
+      - "${MYSQL_SLAVE_PORT:-3308}:3306"
+    volumes:
+      - ./infra/mysql/slave/init:/docker-entrypoint-initdb.d
+      - slave_data:/var/lib/mysql
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpass"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  replication-setup:
+    image: mysql:8.0
+    container_name: replication-setup
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+      mysql-slave:
+        condition: service_healthy
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_ADMIN_USER: ${MYSQL_ADMIN_USER:-admin_user}
+      MYSQL_ADMIN_PASSWORD: ${MYSQL_ADMIN_PASSWORD:-admin_pass}
+      MYSQL_REPL_USER: ${MYSQL_REPL_USER:-repl_user}
+      MYSQL_REPL_PASSWORD: ${MYSQL_REPL_PASSWORD:-repl_pass}
+    volumes:
+      - ./infra/mysql/scripts:/scripts
+    entrypoint:
+      [
+        "/bin/bash",
+        "-lc",
+        "tr -d '\\r' < /scripts/setup-replication.sh > /tmp/setup-replication.sh && chmod +x /tmp/setup-replication.sh && /bin/bash /tmp/setup-replication.sh",
+      ]
+    networks:
+      - app-net
+    restart: "no"
+
+  api-node-1:
+    build:
+      context: ./api
+    container_name: api-node-1
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      SERVER_ID: Node_1
+      DB_WRITE_HOST: mysql-master
+      DB_WRITE_PORT: 3306
+      DB_WRITE_USER: ${MYSQL_APP_USER:-app_user}
+      DB_WRITE_PASSWORD: ${MYSQL_APP_PASSWORD:-app_pass}
+      DB_WRITE_DATABASE: ${MYSQL_DATABASE:-scalable_app}
+      DB_READ_HOST: mysql-slave
+      DB_READ_PORT: 3306
+      DB_READ_USER: ${MYSQL_APP_USER:-app_user}
+      DB_READ_PASSWORD: ${MYSQL_APP_PASSWORD:-app_pass}
+      DB_READ_DATABASE: ${MYSQL_DATABASE:-scalable_app}
+    depends_on:
+      replication-setup:
+        condition: service_completed_successfully
+    networks:
+      - app-net
+
+  api-node-2:
+    build:
+      context: ./api
+    container_name: api-node-2
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      SERVER_ID: Node_2
+      DB_WRITE_HOST: mysql-master
+      DB_WRITE_PORT: 3306
+      DB_WRITE_USER: ${MYSQL_APP_USER:-app_user}
+      DB_WRITE_PASSWORD: ${MYSQL_APP_PASSWORD:-app_pass}
+      DB_WRITE_DATABASE: ${MYSQL_DATABASE:-scalable_app}
+      DB_READ_HOST: mysql-slave
+      DB_READ_PORT: 3306
+      DB_READ_USER: ${MYSQL_APP_USER:-app_user}
+      DB_READ_PASSWORD: ${MYSQL_APP_PASSWORD:-app_pass}
+      DB_READ_DATABASE: ${MYSQL_DATABASE:-scalable_app}
+    depends_on:
+      replication-setup:
+        condition: service_completed_successfully
+    networks:
+      - app-net
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: nginx-lb
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api-node-1
+      - api-node-2
+    networks:
+      - app-net
+
+volumes:
+  master_data:
+  slave_data:
+
+networks:
+  app-net:
+    driver: bridge
